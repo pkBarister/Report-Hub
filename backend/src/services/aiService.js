@@ -1,7 +1,9 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const fs = require("fs");
 
+// Gemma 4 is accessed through the same Google AI SDK & API key
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "DUMMY_KEY");
+const GEMMA_MODEL = process.env.GEMMA_MODEL || "gemma-4-27b-it";
 
 class AIService {
   /**
@@ -9,7 +11,7 @@ class AIService {
    * Swaps old data for new data into a customized Tiptap JSON schema.
    */
   async styleTransfer(templateContent, userNotes) {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const model = genAI.getGenerativeModel({ model: GEMMA_MODEL });
 
     const prompt = `
       You are a professional academic writing assistant.
@@ -51,7 +53,7 @@ class AIService {
    */
   async processAudioToReport(filePath) {
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      const model = genAI.getGenerativeModel({ model: GEMMA_MODEL });
       const audioData = fs.readFileSync(filePath);
       const base64Audio = audioData.toString("base64");
 

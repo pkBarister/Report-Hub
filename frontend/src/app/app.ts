@@ -1,5 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewChecked, Component, ElementRef, ViewChild } from '@angular/core';
+import { AfterViewChecked, Component, ElementRef, inject, ViewChild } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { ApiService } from './services/api.service';
+import { AuthService } from './services/auth.service';
 
 type Page = 'home' | 'templates' | 'workspace' | 'preview';
 
@@ -51,22 +54,63 @@ const MTN_REPORT_CONTENT = `<div class="section-title">CHAPTER 2</div>
 
 @Component({
   selector: 'app-root',
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
 export class App implements AfterViewChecked {
   @ViewChild('editor') editor?: ElementRef<HTMLDivElement>;
 
+  // ──────────────────────────────────────────────
+  // Service injection
+  // ──────────────────────────────────────────────
+  private readonly api = inject(ApiService);
+  readonly auth = inject(AuthService);
+
+  // ──────────────────────────────────────────────
+  // Navigation state
+  // ──────────────────────────────────────────────
   currentPage: Page = 'home';
   initialContent: string | null = null;
+  private pendingEditorContent = false;
+
+  // ──────────────────────────────────────────────
+  // UI state
+  // ──────────────────────────────────────────────
   searchQuery = '';
   activeCategory = 'all';
   isDictating = false;
   leftSidebarOpen = true;
   rightSidebarOpen = true;
-  private pendingEditorContent = false;
 
+  // ──────────────────────────────────────────────
+  // AI assistant state (Templates page)
+  // ──────────────────────────────────────────────
+  assistantNotes = '';
+  isMatchingTemplate = false;
+  assistantError = '';
+
+  // ──────────────────────────────────────────────
+  // Smart-input state (Workspace page)
+  // ──────────────────────────────────────────────
+  smartInputText = '';
+  isRefining = false;
+  refineError = '';
+
+  // ──────────────────────────────────────────────
+  // Export state
+  // ──────────────────────────────────────────────
+  isExportingPptx = false;
+  exportError = '';
+
+  // ──────────────────────────────────────────────
+  // Speech recognition
+  // ──────────────────────────────────────────────
+  private recognition: any = null;
+
+  // ──────────────────────────────────────────────
+  // Static data
+  // ──────────────────────────────────────────────
   readonly chapters = [
     { id: 'cover', title: 'TTU Cover Page', icon: 'TTU', complete: true },
     { id: 'acknowledgement', title: 'Acknowledgement', icon: 'DOC', complete: true },
@@ -145,12 +189,22 @@ export class App implements AfterViewChecked {
 
   readonly lineNumbers = Array.from({ length: 60 }, (_, index) => index + 1);
 
+  // ──────────────────────────────────────────────
+  // Navigation
+  // ──────────────────────────────────────────────
   navigate(page: Page, content: string | null = null): void {
     this.initialContent = content;
     this.currentPage = page;
     this.pendingEditorContent = page === 'workspace' && !!content;
+    // Clear any lingering errors when navigating away
+    this.assistantError = '';
+    this.refineError = '';
+    this.exportError = '';
   }
 
+  // ──────────────────────────────────────────────
+  // Template filtering
+  // ──────────────────────────────────────────────
   filteredCategories(): TemplateCategory[] {
     return this.templateCategories
       .filter((category) => this.activeCategory === 'all' || category.id === this.activeCategory)
@@ -164,22 +218,222 @@ export class App implements AfterViewChecked {
       .filter((category) => category.templates.length > 0);
   }
 
-  useTemplate(): void {
-    this.navigate('workspace', MTN_REPORT_CONTENT);
-  }
-
   setSearchQuery(event: Event): void {
     this.searchQuery = (event.target as HTMLInputElement).value;
   }
 
+  // ──────────────────────────────────────────────
+  // AI: Match Template (Templates page)
+  // ──────────────────────────────────────────────
+  matchTemplate(): void {
+    const notes = this.assistantNotes.trim();
+    if (!notes) {
+      // Fallback: use built-in MTN template
+      this.navigate('workspace', MTN_REPORT_CONTENT);
+      return;
+    }
+
+    this.isMatchingTemplate = true;
+    this.assistantError = '';
+
+    this.api.generateAIReport({ userNotes: notes }).subscribe({
+      next: (res) => {
+        this.isMatchingTemplate = false;
+        // Convert the Tiptap JSON into plain HTML for the contenteditable editor
+        const html = this.tiptapToHtml(res.transformedContent as any);
+        this.navigate('workspace', html || MTN_REPORT_CONTENT);
+      },
+      error: (err) => {
+        this.isMatchingTemplate = false;
+        this.assistantError = err?.error?.error || 'AI service unavailable – using sample template.';
+        // Graceful degradation: still open workspace with sample
+        this.navigate('workspace', MTN_REPORT_CONTENT);
+      },
+    });
+  }
+
+  /** Legacy alias kept for template cards that still call useTemplate() */
+  useTemplate(): void {
+    this.navigate('workspace', MTN_REPORT_CONTENT);
+  }
+
+  // ──────────────────────────────────────────────
+  // AI: Refine (Workspace smart-input)
+  // ──────────────────────────────────────────────
+  refineContent(): void {
+    const prompt = this.smartInputText.trim();
+    if (!prompt || !this.editor?.nativeElement) return;
+
+    const currentHtml = this.editor.nativeElement.innerHTML;
+    this.isRefining = true;
+    this.refineError = '';
+
+    this.api.generateAIReport({ userNotes: prompt, templateContent: { rawHtml: currentHtml } }).subscribe({
+      next: (res) => {
+        this.isRefining = false;
+        const html = this.tiptapToHtml(res.transformedContent as any);
+        if (html && this.editor?.nativeElement) {
+          this.editor.nativeElement.innerHTML = html;
+        }
+        this.smartInputText = '';
+      },
+      error: (err) => {
+        this.isRefining = false;
+        this.refineError = err?.error?.error || 'Refine failed. Please try again.';
+      },
+    });
+  }
+
+  // ──────────────────────────────────────────────
+  // Export: PDF (browser print)
+  // ──────────────────────────────────────────────
   printDocument(): void {
     window.print();
   }
 
+  // ──────────────────────────────────────────────
+  // Export: PowerPoint
+  // ──────────────────────────────────────────────
+  exportPptx(): void {
+    if (!this.editor?.nativeElement) return;
+
+    const editorHtml = this.editor.nativeElement.innerHTML;
+    const tiptapDoc = this.htmlToTiptap(editorHtml);
+    const title = 'Internship Report Presentation';
+
+    this.isExportingPptx = true;
+    this.exportError = '';
+
+    this.api.exportPptx(tiptapDoc, title).subscribe({
+      next: (blob) => {
+        this.isExportingPptx = false;
+        // Trigger browser download
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${title}.pptx`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      error: (err) => {
+        this.isExportingPptx = false;
+        this.exportError = 'PPTX export failed. Please try again.';
+        console.error('PPTX Export Error:', err);
+      },
+    });
+  }
+
+  // ──────────────────────────────────────────────
+  // Dictate (Web Speech API)
+  // ──────────────────────────────────────────────
+  toggleDictate(): void {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not supported in this browser. Try Chrome.');
+      return;
+    }
+
+    if (this.isDictating) {
+      this.recognition?.stop();
+      this.isDictating = false;
+      return;
+    }
+
+    this.recognition = new SpeechRecognition();
+    this.recognition.lang = 'en-US';
+    this.recognition.continuous = true;
+    this.recognition.interimResults = false;
+
+    this.recognition.onresult = (event: any) => {
+      const transcript: string = Array.from(event.results as any[])
+        .map((r: any) => r[0].transcript)
+        .join(' ');
+      if (this.editor?.nativeElement) {
+        this.editor.nativeElement.innerHTML += `<div>${transcript}</div>`;
+      }
+    };
+
+    this.recognition.onerror = () => {
+      this.isDictating = false;
+    };
+
+    this.recognition.onend = () => {
+      this.isDictating = false;
+    };
+
+    this.recognition.start();
+    this.isDictating = true;
+  }
+
+  // ──────────────────────────────────────────────
+  // Lifecycle
+  // ──────────────────────────────────────────────
   ngAfterViewChecked(): void {
     if (this.pendingEditorContent && this.editor?.nativeElement && this.initialContent) {
       this.editor.nativeElement.innerHTML = this.initialContent;
       this.pendingEditorContent = false;
     }
+  }
+
+  // ──────────────────────────────────────────────
+  // Helpers: Tiptap JSON ↔ HTML
+  // ──────────────────────────────────────────────
+
+  /** Recursively convert a Tiptap document JSON into basic HTML */
+  private tiptapToHtml(doc: any): string {
+    if (!doc || !doc.content) return '';
+    return doc.content.map((node: any) => this.nodeToHtml(node)).join('');
+  }
+
+  private nodeToHtml(node: any): string {
+    if (!node) return '';
+    const inner = node.text ?? (node.content?.map((c: any) => this.nodeToHtml(c)).join('') ?? '');
+
+    switch (node.type) {
+      case 'heading': {
+        const level = node.attrs?.level ?? 2;
+        return `<h${level}>${inner}</h${level}>`;
+      }
+      case 'paragraph':
+        return `<div>${inner}</div><br/>`;
+      case 'bulletList':
+        return `<ul>${inner}</ul>`;
+      case 'orderedList':
+        return `<ol>${inner}</ol>`;
+      case 'listItem':
+        return `<li>${inner}</li>`;
+      case 'text':
+        return node.text ?? '';
+      default:
+        return inner;
+    }
+  }
+
+  /** Build a minimal Tiptap doc JSON from raw HTML (for PPTX export) */
+  private htmlToTiptap(html: string): object {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const content: object[] = [];
+
+    doc.body.childNodes.forEach((node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = (node.textContent ?? '').trim();
+        if (text) content.push({ type: 'paragraph', content: [{ type: 'text', text }] });
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as Element;
+        const tag = el.tagName.toLowerCase();
+        const text = (el.textContent ?? '').trim();
+        if (!text) return;
+
+        if (['h1', 'h2', 'h3', 'h4'].includes(tag)) {
+          content.push({ type: 'heading', attrs: { level: parseInt(tag[1], 10) }, content: [{ type: 'text', text }] });
+        } else {
+          content.push({ type: 'paragraph', content: [{ type: 'text', text }] });
+        }
+      }
+    });
+
+    return { type: 'doc', content };
   }
 }

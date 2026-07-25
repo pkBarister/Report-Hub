@@ -7,8 +7,22 @@ const reportRoutes = require("./routes/reportRoutes");
 const app = express();
 
 // --- MIDDLEWARE ---
-// Allows your React frontend to talk to this backend (Cross-Origin Resource Sharing)
-app.use(cors());
+// Allow Angular frontend (port 4200) and any configured origin to call this API
+const allowedOrigins = [
+  process.env.CORS_ORIGIN || 'http://localhost:4200',
+  'http://localhost:3000',
+];
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. curl, Postman) or matching origins
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+}));
 
 // Allows the app to parse incoming JSON data in request bodies
 app.use(express.json());
