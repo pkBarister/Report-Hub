@@ -448,8 +448,43 @@ button {
   padding: 16px;
 }
 
+.assistant-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 0 6px 6px;
+}
+
+.assistant-actions .dictate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(37, 99, 235, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.assistant-actions .dictate-btn:hover {
+  background: rgba(37, 99, 235, 0.25);
+  color: #ffffff;
+}
+
+.assistant-actions .dictate-btn.listening {
+  background: rgba(239, 68, 68, 0.2) !important;
+  color: #f87171 !important;
+  border-color: rgba(248, 113, 113, 0.4) !important;
+  animation: pulse-glow 1.5s infinite alternate;
+}
+
 .assistant-input .primary-button {
-  float: right;
   border-radius: 14px;
   padding-block: 11px;
 }
@@ -772,8 +807,9 @@ button {
 .editor-shell {
   flex: 1;
   overflow: auto;
-  display: grid;
-  justify-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 48px;
   min-width: 760px;
   padding: 48px 32px 110px;
@@ -785,12 +821,14 @@ button {
 .print-paper {
   width: 800px;
   min-height: 1130px;
+  height: auto;
   position: relative;
-  background: #fff;
+  background: #ffffff;
   color: #0f172a;
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.38);
   border: 1px solid #cbd5e1;
   font-family: Georgia, 'Times New Roman', serif;
+  box-sizing: border-box;
 }
 
 .cover-page,
@@ -909,6 +947,12 @@ button {
 
 .editor-page {
   padding: 54px 0 60px;
+  position: relative;
+  min-height: 1130px;
+  height: auto !important;
+  display: block !important;
+  overflow: visible !important;
+  background: #ffffff;
 }
 
 .page-marker {
@@ -926,6 +970,7 @@ button {
     sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.12em;
+  z-index: 2;
 }
 
 .line-column {
@@ -938,10 +983,12 @@ button {
   flex-direction: column;
   text-align: right;
   padding-right: 14px;
-  color: #cbd5e1;
+  color: #94a3b8;
   background: #f8fafc;
   border-right: 1px solid #e2e8f0;
   overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .line-column span,
@@ -958,12 +1005,32 @@ button {
 }
 
 .editor-content {
+  display: block !important;
   min-height: 1000px;
+  height: auto !important;
   margin-left: 64px;
-  padding: 0 48px;
+  padding: 10px 48px 60px 48px;
   outline: 0;
   color: #1e293b;
   font-size: 18px;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  background: #ffffff;
+  overflow: visible;
+}
+
+mark.ai-refined {
+  background: rgba(250, 204, 21, 0.35);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.editor-content img,
+.editor-content table,
+.editor-content pre {
+  max-width: 100% !important;
+  box-sizing: border-box;
 }
 
 .section-title {

@@ -100,9 +100,14 @@
             </div>
             <div class="assistant-input">
               <textarea [(ngModel)]="assistantNotes" placeholder="Example: I was at MTN working on fibre sales, customer follow-ups, and installations."></textarea>
-              <button class="primary-button" [disabled]="isMatchingTemplate" (click)="matchTemplate()">
-                {{ isMatchingTemplate ? 'Generating with Gemma 4...' : 'Match Template' }}
-              </button>
+              <div class="assistant-actions">
+                <button class="dictate-btn" [class.listening]="isDictatingAssistant" (click)="toggleAssistantDictate()" type="button" title="Dictate your internship tasks using voice">
+                  🎤 {{ isDictatingAssistant ? 'Listening...' : 'Dictate Tasks' }}
+                </button>
+                <button class="primary-button" [disabled]="isMatchingTemplate" (click)="matchTemplate()">
+                  {{ isMatchingTemplate ? 'Generating with Local Gemma 4 (Ollama)...' : 'Match Template' }}
+                </button>
+              </div>
             </div>
             @if (assistantError) {
               <p style="color: #f87171; font-size: 13px; margin-top: 8px;">{{ assistantError }}</p>

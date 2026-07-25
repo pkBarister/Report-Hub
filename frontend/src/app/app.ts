@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewChecked, Component, ElementRef, inject, OnInit, ViewChild } from '@angular/core';
+import { AfterViewChecked, ChangeDetectorRef, Component, ElementRef, inject, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService, DbTemplate } from './services/api.service';
 import { AuthService } from './services/auth.service';
@@ -67,6 +67,7 @@ export class App implements OnInit, AfterViewChecked {
   // Service injection
   // ──────────────────────────────────────────────
   private readonly api = inject(ApiService);
+  private readonly cdr = inject(ChangeDetectorRef);
   readonly auth = inject(AuthService);
 
   // ──────────────────────────────────────────────
@@ -102,6 +103,8 @@ export class App implements OnInit, AfterViewChecked {
   assistantNotes = '';
   isMatchingTemplate = false;
   assistantError = '';
+  isDictatingAssistant = false;
+  private assistantRecognition: any = null;
 
   // ──────────────────────────────────────────────
   // Smart-input state (Workspace page)
@@ -215,7 +218,7 @@ export class App implements OnInit, AfterViewChecked {
     },
   ];
 
-  readonly lineNumbers = Array.from({ length: 60 }, (_, index) => index + 1);
+  readonly lineNumbers = Array.from({ length: 500 }, (_, index) => index + 1);
 
   ngOnInit(): void {
     this.loadCustomTemplates();
@@ -437,24 +440,40 @@ export class App implements OnInit, AfterViewChecked {
   // ──────────────────────────────────────────────
   refineContent(): void {
     const prompt = this.smartInputText.trim();
-    if (!prompt || !this.editor?.nativeElement) return;
+    if (!prompt || !this.editor?.nativeElement || this.isRefining) return;
 
-    const currentHtml = this.editor.nativeElement.innerHTML;
+    // Strip existing yellow highlight marks before sending to AI
+    const rawHtml = this.editor.nativeElement.innerHTML
+      .replace(/<mark[^>]*class="ai-refined"[^>]*>/gi, '')
+      .replace(/<\/mark>/gi, '');
+
     this.isRefining = true;
     this.refineError = '';
+    this.cdr.detectChanges();
 
-    this.api.generateAIReport({ userNotes: prompt, templateContent: { rawHtml: currentHtml } }).subscribe({
+    this.api.generateAIReport({ userNotes: prompt, templateContent: { rawHtml } }).subscribe({
       next: (res) => {
-        this.isRefining = false;
-        const html = this.tiptapToHtml(res.transformedContent as any);
-        if (html && this.editor?.nativeElement) {
-          this.editor.nativeElement.innerHTML = html;
+        try {
+          const refinedHtml = this.tiptapToHtml(res.transformedContent as any);
+          if (refinedHtml && this.editor?.nativeElement) {
+            // Wrap every block of the refined output in a yellow highlight
+            const highlighted = refinedHtml
+              .replace(/<(h[1-6]|div|p)([^>]*)>/gi, '<$1$2><mark class="ai-refined">')
+              .replace(/<\/(h[1-6]|div|p)>/gi, '</mark></$1>');
+            this.editor.nativeElement.innerHTML = highlighted;
+          }
+          this.smartInputText = '';
+        } catch (err) {
+          console.error('Refine rendering error:', err);
+        } finally {
+          this.isRefining = false;
+          this.cdr.detectChanges();
         }
-        this.smartInputText = '';
       },
       error: (err) => {
         this.isRefining = false;
         this.refineError = err?.error?.error || 'Refine failed. Please try again.';
+        this.cdr.detectChanges();
       },
     });
   }
@@ -539,6 +558,44 @@ export class App implements OnInit, AfterViewChecked {
 
     this.recognition.start();
     this.isDictating = true;
+  }
+
+  toggleAssistantDictate(): void {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not supported in this browser. Try Chrome.');
+      return;
+    }
+
+    if (this.isDictatingAssistant) {
+      this.assistantRecognition?.stop();
+      this.isDictatingAssistant = false;
+      return;
+    }
+
+    this.assistantRecognition = new SpeechRecognition();
+    this.assistantRecognition.lang = 'en-US';
+    this.assistantRecognition.continuous = true;
+    this.assistantRecognition.interimResults = false;
+
+    this.assistantRecognition.onresult = (event: any) => {
+      const transcript: string = Array.from(event.results as any[])
+        .map((r: any) => r[0].transcript)
+        .join(' ');
+      this.assistantNotes = (this.assistantNotes ? this.assistantNotes + ' ' : '') + transcript;
+    };
+
+    this.assistantRecognition.onerror = () => {
+      this.isDictatingAssistant = false;
+    };
+
+    this.assistantRecognition.onend = () => {
+      this.isDictatingAssistant = false;
+    };
+
+    this.assistantRecognition.start();
+    this.isDictatingAssistant = true;
   }
 
   // ──────────────────────────────────────────────
