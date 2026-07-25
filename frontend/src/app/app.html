@@ -284,16 +284,44 @@
 
         @if (rightSidebarOpen) {
           <aside class="media-sidebar">
-            <h3>Media Assets</h3>
-            <button class="upload-box">Upload Media<br /><small>Drag and drop images here</small></button>
-            @for (media of mediaLibrary; track media.id) {
-              <article class="media-card">
-                <img [src]="media.url" [alt]="media.name" />
-                <strong>{{ media.name }}</strong>
-                <span>{{ media.date }}</span>
-              </article>
+            <div class="sidebar-header-row">
+              <h3>Media Assets</h3>
+              <span class="ai-badge">Vision AI</span>
+            </div>
+            
+            <div class="media-upload-area">
+              <input type="file" id="activityImgInput" (change)="onActivityImageSelected($event)" accept="image/*" hidden />
+              <label for="activityImgInput" class="upload-box" [class.uploading]="isUploadingActivityImage">
+                <span class="upload-icon">📷</span>
+                @if (isUploadingActivityImage) {
+                  <strong>Analyzing Image & Writing Report...</strong>
+                  <small>Extracting notes & generating text via Vision AI</small>
+                } @else {
+                  <strong>Upload Activity Image / Notes</strong>
+                  <small>Upload photos of logbooks, whiteboards, or field activities to auto-generate report text</small>
+                }
+              </label>
+            </div>
+
+            @if (imageUploadError) {
+              <p style="color: #f87171; font-size: 12px; margin-top: 6px;">{{ imageUploadError }}</p>
             }
-            <p class="tip"><strong>Tip:</strong> Dictate image placement by saying "Insert Network Topology on line 5".</p>
+
+            <div class="media-list">
+              @for (media of mediaLibrary; track media.id) {
+                <article class="media-card">
+                  <div class="media-thumb">
+                    <img [src]="media.url" [alt]="media.name" />
+                  </div>
+                  <div class="media-info">
+                    <strong>{{ media.name }}</strong>
+                    <span>{{ media.date }}</span>
+                    <button class="insert-media-btn" (click)="insertMediaIntoReport(media)">+ Insert Image & Text</button>
+                  </div>
+                </article>
+              }
+            </div>
+            <p class="tip"><strong>Tip:</strong> Upload activity photos to automatically generate formal report sections.</p>
           </aside>
         }
       </div>

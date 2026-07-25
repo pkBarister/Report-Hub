@@ -135,24 +135,33 @@ export class App implements OnInit, AfterViewChecked {
     { id: 'references', title: 'References', icon: 'DOC' },
   ];
 
-  readonly mediaLibrary = [
+  // ──────────────────────────────────────────────
+  // Activity Image Upload & Report Generation (Right Sidebar)
+  // ──────────────────────────────────────────────
+  isUploadingActivityImage = false;
+  imageUploadError = '';
+
+  mediaLibrary: Array<{ id: string; url: string; name: string; date: string; htmlContent?: string }> = [
     {
       id: 'img-1',
       url: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=300&auto=format&fit=crop',
       name: 'Network_Topology.png',
       date: 'Today',
+      htmlContent: '<div class="section-subtitle emphasized">Network Topology Inspection</div><br/><div>Analyzed field network topology layout and verified cable routing between client nodes.</div><br/>',
     },
     {
       id: 'img-2',
       url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=300&auto=format&fit=crop',
       name: 'Global_Architecture.jpg',
       date: 'Yesterday',
+      htmlContent: '<div class="section-subtitle emphasized">Infrastructure Architecture</div><br/><div>Reviewed server cluster setup and bandwidth allocation for peak hours.</div><br/>',
     },
     {
       id: 'img-3',
       url: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=300&auto=format&fit=crop',
       name: 'Data_Analysis_Chart.png',
       date: 'Oct 12',
+      htmlContent: '<div class="section-subtitle emphasized">Data Metrics & Analysis</div><br/><div>Compiled daily installation statistics and performance metrics.</div><br/>',
     },
   ];
 
@@ -339,6 +348,53 @@ export class App implements OnInit, AfterViewChecked {
       },
       error: (err) => console.error('Failed to delete template:', err),
     });
+  }
+
+  // ──────────────────────────────────────────────
+  // Vision AI: Activity Image to Report
+  // ──────────────────────────────────────────────
+  onActivityImageSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    this.isUploadingActivityImage = true;
+    this.imageUploadError = '';
+
+    this.api.uploadActivityImage(file).subscribe({
+      next: (res) => {
+        this.isUploadingActivityImage = false;
+
+        const newMediaItem = {
+          id: `img-${Date.now()}`,
+          url: res.imageUrl,
+          name: res.filename,
+          date: 'Just now',
+          htmlContent: res.htmlContent,
+        };
+
+        // Add item to media library on right sidebar
+        this.mediaLibrary.unshift(newMediaItem);
+
+        // Automatically append the AI-generated report section into the editor content!
+        this.insertMediaIntoReport(newMediaItem);
+        input.value = '';
+      },
+      error: (err) => {
+        this.isUploadingActivityImage = false;
+        this.imageUploadError = err?.error?.error || 'Failed to process activity image.';
+      },
+    });
+  }
+
+  insertMediaIntoReport(media: { url: string; name: string; htmlContent?: string }): void {
+    if (!this.editor?.nativeElement) return;
+
+    const imageHtml = `<div style="margin: 16px 0; text-align: center;"><img src="${media.url}" alt="${media.name}" style="max-width: 100%; max-height: 300px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);" /><br/><small style="color: #94a3b8; font-style: italic;">Figure: ${media.name}</small></div><br/>`;
+    const reportTextHtml = media.htmlContent || `<div>Analyzed task: ${media.name}. Activity logged and documented.</div><br/>`;
+
+    // Append image + text block to editor content
+    this.editor.nativeElement.innerHTML += `${imageHtml}${reportTextHtml}`;
   }
 
   // ──────────────────────────────────────────────
