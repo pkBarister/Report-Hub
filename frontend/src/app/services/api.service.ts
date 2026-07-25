@@ -19,6 +19,17 @@ export interface AuthResponse {
   user: { id: string; name: string; email: string };
 }
 
+export interface DbTemplate {
+  id: string;
+  title: string;
+  type?: string;
+  category?: string;
+  description?: string;
+  content?: any;
+  is_custom?: boolean;
+  created_at?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly http = inject(HttpClient);
@@ -38,6 +49,13 @@ export class ApiService {
     return this.http.post<{ reportId: string; content: object }>(`${this.baseUrl}/reports/audio`, form);
   }
 
+  /** Upload internship activity photo/notes and generate report section via Vision AI */
+  uploadActivityImage(file: File): Observable<{ imageUrl: string; filename: string; htmlContent: string; tiptapContent: object }> {
+    const form = new FormData();
+    form.append('image', file, file.name);
+    return this.http.post<{ imageUrl: string; filename: string; htmlContent: string; tiptapContent: object }>(`${this.baseUrl}/reports/image`, form);
+  }
+
   /** Export a report to PowerPoint — returns a Blob for download */
   exportPptx(content: object, title: string): Observable<Blob> {
     return this.http.post(
@@ -45,6 +63,26 @@ export class ApiService {
       { content, title },
       { responseType: 'blob' },
     );
+  }
+
+  /** Upload a document (.docx, .pdf, .txt, .md) as a custom template */
+  uploadTemplateDocument(file: File, title: string, category: string, description: string): Observable<{ message: string; template: DbTemplate }> {
+    const form = new FormData();
+    form.append('document', file, file.name);
+    form.append('title', title);
+    form.append('category', category);
+    form.append('description', description);
+    return this.http.post<{ message: string; template: DbTemplate }>(`${this.baseUrl}/templates/upload`, form);
+  }
+
+  /** Get all templates from the database */
+  getTemplates(): Observable<DbTemplate[]> {
+    return this.http.get<DbTemplate[]>(`${this.baseUrl}/templates`);
+  }
+
+  /** Delete a custom template */
+  deleteTemplate(id: string): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.baseUrl}/templates/${id}`);
   }
 
   /** Auth – login */

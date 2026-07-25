@@ -150,3 +150,35 @@ exports.exportPowerPoint = async (req, res) => {
     res.status(500).json({ error: "Failed to generate PowerPoint presentation" });
   }
 };
+
+// 6. Upload Activity Image & Extract Text to Write Report
+exports.uploadImageReport = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No image file uploaded" });
+    }
+
+    const filePath = req.file.path;
+    const mimeType = req.file.mimetype;
+    const filename = req.file.filename;
+
+    // Process image using Vision AI
+    const result = await AIService.processImageToReport(filePath, mimeType);
+
+    // Build accessible URL for frontend
+    const host = req.get("host") || "localhost:5000";
+    const protocol = req.protocol || "http";
+    const imageUrl = `${protocol}://${host}/uploads/${filename}`;
+
+    res.status(200).json({
+      message: "Activity image analyzed successfully",
+      imageUrl,
+      filename: req.file.originalname,
+      tiptapContent: result.tiptapContent,
+      htmlContent: result.htmlContent,
+    });
+  } catch (error) {
+    console.error("Image Report Generation Error:", error);
+    res.status(500).json({ error: error.message || "Failed to process activity image" });
+  }
+};

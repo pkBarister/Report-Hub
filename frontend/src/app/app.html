@@ -91,17 +91,64 @@
           <p>Choose from professionally designed report templates tailored for TTU students across multiple disciplines.</p>
         </header>
 
-        <section class="assistant-panel">
-          <div>
-            <span class="eyebrow">AI Selection Assistant</span>
-            <h2>Not sure which one to use?</h2>
-            <p>Describe your internship tasks and Report Pen will preload a matching report structure.</p>
-          </div>
-          <div class="assistant-input">
-            <textarea placeholder="Example: I was at MTN working on fibre sales, customer follow-ups, and installations."></textarea>
-            <button class="primary-button" (click)="useTemplate()">Match Template</button>
-          </div>
-        </section>
+        <div class="template-panels-row">
+          <section class="assistant-panel">
+            <div>
+              <span class="eyebrow">AI Selection Assistant</span>
+              <h2>Not sure which one to use?</h2>
+              <p>Describe your internship tasks and Report Pen will preload a matching report structure.</p>
+            </div>
+            <div class="assistant-input">
+              <textarea [(ngModel)]="assistantNotes" placeholder="Example: I was at MTN working on fibre sales, customer follow-ups, and installations."></textarea>
+              <button class="primary-button" [disabled]="isMatchingTemplate" (click)="matchTemplate()">
+                {{ isMatchingTemplate ? 'Generating with Gemma 4...' : 'Match Template' }}
+              </button>
+            </div>
+            @if (assistantError) {
+              <p style="color: #f87171; font-size: 13px; margin-top: 8px;">{{ assistantError }}</p>
+            }
+          </section>
+
+          <section class="assistant-panel upload-panel">
+            <div>
+              <span class="eyebrow">Custom Templates</span>
+              <h2>Upload Document as Template</h2>
+              <p>Upload an existing report (.docx, .pdf, .txt, .md) to parse and convert it into a reusable template.</p>
+            </div>
+            <div class="upload-template-form">
+              <div class="file-drop-zone">
+                <input type="file" id="docFileInput" (change)="onDocumentFileSelected($event)" accept=".docx,.pdf,.txt,.md" hidden />
+                <label for="docFileInput" class="file-drop-label">
+                  <span class="drop-icon">📄</span>
+                  <span>{{ selectedDocumentFile ? selectedDocumentFile.name : 'Choose a document file (.docx, .pdf, .txt, .md)' }}</span>
+                </label>
+              </div>
+
+              <div class="form-inputs-row">
+                <input type="text" [(ngModel)]="uploadTitle" placeholder="Template Title" class="template-input" />
+                <select [(ngModel)]="uploadCategory" class="template-select">
+                  <option value="field-work">Field Work Reports</option>
+                  <option value="software">Software Engineering</option>
+                  <option value="accounting">Accounting Reports</option>
+                  <option value="hospitality">Hospitality Reports</option>
+                  <option value="custom-templates">Custom / General</option>
+                </select>
+              </div>
+              <input type="text" [(ngModel)]="uploadDescription" placeholder="Short description (optional)" class="template-input full-width" />
+
+              <button class="primary-button upload-btn" [disabled]="isUploadingTemplate || !selectedDocumentFile" (click)="uploadDocumentTemplate()">
+                {{ isUploadingTemplate ? 'Parsing & Saving...' : 'Add to Templates' }}
+              </button>
+
+              @if (uploadSuccessMsg) {
+                <p style="color: #4ade80; font-size: 13px; margin-top: 8px;">{{ uploadSuccessMsg }}</p>
+              }
+              @if (uploadErrorMsg) {
+                <p style="color: #f87171; font-size: 13px; margin-top: 8px;">{{ uploadErrorMsg }}</p>
+              }
+            </div>
+          </section>
+        </div>
 
         <div class="category-tabs">
           <button [class.active]="activeCategory === 'all'" (click)="activeCategory = 'all'">All Categories</button>
@@ -122,13 +169,19 @@
               </div>
               <div class="template-grid">
                 @for (template of category.templates; track template.id) {
-                  <article class="template-card">
+                  <article class="template-card" [class.custom-card]="template.isCustom">
+                    @if (template.isCustom) {
+                      <div class="custom-badge">
+                        <span>Custom</span>
+                        <button class="delete-btn" (click)="deleteCustomTemplate(template.id, $event)" title="Delete Template">&times;</button>
+                      </div>
+                    }
                     <div class="document-thumb">
                       <div></div><div></div><div></div><span>{{ category.icon }}</span><div></div><div></div>
                     </div>
                     <h3>{{ template.title }}</h3>
                     <p>{{ template.description }}</p>
-                    <button class="card-button" (click)="useTemplate()">Use Template</button>
+                    <button class="card-button" (click)="useTemplate(template)">Use Template</button>
                   </article>
                 }
               </div>
@@ -155,11 +208,13 @@
           <input value="Industrial_Attachment_Report_2023" aria-label="Document title" />
         </div>
         <div class="smart-input">
-          <input placeholder="Describe your internship tasks... (e.g., Update React components)" />
-          <button>Refine</button>
+          <input [(ngModel)]="smartInputText" (keydown.enter)="refineContent()" placeholder="Describe your internship tasks... (e.g., Update React components)" />
+          <button [disabled]="isRefining" (click)="refineContent()">
+            {{ isRefining ? 'Refining...' : 'Refine' }}
+          </button>
         </div>
         <div class="header-actions">
-          <button>Save</button>
+          <button [disabled]="isExportingPptx" (click)="exportPptx()">{{ isExportingPptx ? 'Exporting...' : 'Export PPTX' }}</button>
           <button (click)="navigate('preview')">Preview</button>
           <button class="primary-small" (click)="navigate('preview')">Export PDF</button>
           <button class="panel-toggle" [class.active]="rightSidebarOpen" (click)="rightSidebarOpen = !rightSidebarOpen">Media</button>
@@ -172,7 +227,7 @@
         <button>B</button><button><i>I</i></button><button><u>U</u></button>
         <button>Left</button><button>Center</button><button>Right</button><button>Justify</button>
         <button>1.5 spacing</button>
-        <button class="dictate" [class.listening]="isDictating" (click)="isDictating = !isDictating">
+        <button class="dictate" [class.listening]="isDictating" (click)="toggleDictate()">
           {{ isDictating ? 'Listening...' : 'Dictate' }}
         </button>
       </div>

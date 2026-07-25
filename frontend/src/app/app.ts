@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewChecked, Component, ElementRef, inject, ViewChild } from '@angular/core';
+import { AfterViewChecked, Component, ElementRef, inject, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ApiService } from './services/api.service';
+import { ApiService, DbTemplate } from './services/api.service';
 import { AuthService } from './services/auth.service';
 
 type Page = 'home' | 'templates' | 'workspace' | 'preview';
@@ -10,6 +10,8 @@ interface TemplateItem {
   id: string;
   title: string;
   description: string;
+  content?: string;
+  isCustom?: boolean;
 }
 
 interface TemplateCategory {
@@ -58,7 +60,7 @@ const MTN_REPORT_CONTENT = `<div class="section-title">CHAPTER 2</div>
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
-export class App implements AfterViewChecked {
+export class App implements OnInit, AfterViewChecked {
   @ViewChild('editor') editor?: ElementRef<HTMLDivElement>;
 
   // ──────────────────────────────────────────────
@@ -82,6 +84,17 @@ export class App implements AfterViewChecked {
   isDictating = false;
   leftSidebarOpen = true;
   rightSidebarOpen = true;
+
+  // ──────────────────────────────────────────────
+  // Document Upload as Template state
+  // ──────────────────────────────────────────────
+  uploadTitle = '';
+  uploadCategory = 'field-work';
+  uploadDescription = '';
+  selectedDocumentFile: File | null = null;
+  isUploadingTemplate = false;
+  uploadSuccessMsg = '';
+  uploadErrorMsg = '';
 
   // ──────────────────────────────────────────────
   // AI assistant state (Templates page)
@@ -109,7 +122,7 @@ export class App implements AfterViewChecked {
   private recognition: any = null;
 
   // ──────────────────────────────────────────────
-  // Static data
+  // Static & Dynamic Template categories
   // ──────────────────────────────────────────────
   readonly chapters = [
     { id: 'cover', title: 'TTU Cover Page', icon: 'TTU', complete: true },
@@ -143,7 +156,13 @@ export class App implements AfterViewChecked {
     },
   ];
 
-  readonly templateCategories: TemplateCategory[] = [
+  templateCategories: TemplateCategory[] = [
+    {
+      id: 'custom-templates',
+      title: 'Uploaded Document Templates',
+      icon: 'upload',
+      templates: [],
+    },
     {
       id: 'field-work',
       title: 'Field Work Reports',
@@ -189,6 +208,47 @@ export class App implements AfterViewChecked {
 
   readonly lineNumbers = Array.from({ length: 60 }, (_, index) => index + 1);
 
+  ngOnInit(): void {
+    this.loadCustomTemplates();
+  }
+
+  /** Fetch uploaded templates from database */
+  loadCustomTemplates(): void {
+    this.api.getTemplates().subscribe({
+      next: (dbTemplates) => {
+        if (!dbTemplates || !Array.isArray(dbTemplates)) return;
+
+        const customItems: TemplateItem[] = dbTemplates.map((t) => {
+          let htmlContent = MTN_REPORT_CONTENT;
+          if (t.content) {
+            if (typeof t.content === 'string') {
+              htmlContent = t.content;
+            } else if (t.content.html) {
+              htmlContent = t.content.html;
+            } else if (t.content.text) {
+              htmlContent = `<div>${t.content.text.replace(/\n/g, '<br/>')}</div>`;
+            }
+          }
+
+          return {
+            id: t.id,
+            title: t.title,
+            description: t.description || 'Uploaded custom document template.',
+            content: htmlContent,
+            isCustom: true,
+          };
+        });
+
+        // Update custom category
+        const customCat = this.templateCategories.find((c) => c.id === 'custom-templates');
+        if (customCat) {
+          customCat.templates = customItems;
+        }
+      },
+      error: (err) => console.warn('Could not load custom templates from backend:', err),
+    });
+  }
+
   // ──────────────────────────────────────────────
   // Navigation
   // ──────────────────────────────────────────────
@@ -223,6 +283,65 @@ export class App implements AfterViewChecked {
   }
 
   // ──────────────────────────────────────────────
+  // Upload Document as Template
+  // ──────────────────────────────────────────────
+  onDocumentFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      this.selectedDocumentFile = input.files[0];
+      if (!this.uploadTitle) {
+        // Auto-fill title from filename without extension
+        this.uploadTitle = this.selectedDocumentFile.name.replace(/\.[^/.]+$/, '');
+      }
+    }
+  }
+
+  uploadDocumentTemplate(): void {
+    if (!this.selectedDocumentFile) {
+      this.uploadErrorMsg = 'Please select a document file (.docx, .pdf, .txt, .md).';
+      return;
+    }
+
+    this.isUploadingTemplate = true;
+    this.uploadErrorMsg = '';
+    this.uploadSuccessMsg = '';
+
+    this.api
+      .uploadTemplateDocument(
+        this.selectedDocumentFile,
+        this.uploadTitle,
+        this.uploadCategory,
+        this.uploadDescription
+      )
+      .subscribe({
+        next: (res) => {
+          this.isUploadingTemplate = false;
+          this.uploadSuccessMsg = `Template "${res.template.title}" created successfully!`;
+          this.uploadTitle = '';
+          this.uploadDescription = '';
+          this.selectedDocumentFile = null;
+          this.loadCustomTemplates();
+        },
+        error: (err) => {
+          this.isUploadingTemplate = false;
+          this.uploadErrorMsg = err?.error?.error || 'Failed to parse and upload document template.';
+        },
+      });
+  }
+
+  deleteCustomTemplate(id: string, event: Event): void {
+    event.stopPropagation();
+    if (!confirm('Are you sure you want to delete this custom template?')) return;
+
+    this.api.deleteTemplate(id).subscribe({
+      next: () => {
+        this.loadCustomTemplates();
+      },
+      error: (err) => console.error('Failed to delete template:', err),
+    });
+  }
+
+  // ──────────────────────────────────────────────
   // AI: Match Template (Templates page)
   // ──────────────────────────────────────────────
   matchTemplate(): void {
@@ -252,9 +371,9 @@ export class App implements AfterViewChecked {
     });
   }
 
-  /** Legacy alias kept for template cards that still call useTemplate() */
-  useTemplate(): void {
-    this.navigate('workspace', MTN_REPORT_CONTENT);
+  useTemplate(template?: TemplateItem): void {
+    const contentToUse = template?.content || MTN_REPORT_CONTENT;
+    this.navigate('workspace', contentToUse);
   }
 
   // ──────────────────────────────────────────────

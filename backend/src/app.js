@@ -4,7 +4,14 @@ const authRoutes = require("./routes/authRoutes");
 const workspaceRoutes = require("./routes/workspaceRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 
+const templateRoutes = require("./routes/templateRoutes");
+
+const path = require("path");
+
 const app = express();
+
+// Serve uploaded images and files statically
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // --- MIDDLEWARE ---
 // Allow Angular frontend (port 4200) and any configured origin to call this API
@@ -32,6 +39,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/workspaces", workspaceRoutes); // Add this
 app.use("/api/reports", reportRoutes);
+app.use("/api/templates", templateRoutes);
 
 // Basic health check route
 app.get("/", (req, res) => {
