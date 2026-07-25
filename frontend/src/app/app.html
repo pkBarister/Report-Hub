@@ -1,0 +1,290 @@
+@switch (currentPage) {
+  @case ('home') {
+    <div class="page dark home-page">
+      <div class="glow glow-blue"></div>
+      <div class="glow glow-purple"></div>
+
+      <nav class="top-nav">
+        <button class="brand" (click)="navigate('home')">
+          <span class="brand-mark">RP</span>
+          <span>Report Pen<span class="accent">.</span></span>
+        </button>
+        <div class="nav-links">
+          <a href="#features">Features</a>
+          <button (click)="navigate('templates')">Templates</button>
+          <a href="#instructions">Instructions</a>
+        </div>
+        <div class="nav-actions">
+          <button class="ghost-button">Log in</button>
+          <button class="soft-button">Sign up</button>
+        </div>
+      </nav>
+
+      <main class="hero">
+        <section class="hero-copy">
+          <div class="eyebrow">Built exclusively for TTU Students</div>
+          <h1>
+            Next-gen report
+            <span>writing experience</span>
+          </h1>
+          <p>
+            Standardize your university reports effortlessly. Start with TTU templates,
+            use smart writing assistance with numbered lines, and produce print-ready
+            documents in minutes.
+          </p>
+          <div class="hero-actions">
+            <button class="primary-button" (click)="navigate('workspace')">Start a new report</button>
+            <button class="outline-button" (click)="navigate('templates')">View templates</button>
+          </div>
+          <div class="stats">
+            <div><strong>50+</strong><span>TTU Templates</span></div>
+            <div><strong>10x</strong><span>Faster Editing</span></div>
+            <div><strong>100%</strong><span>Print Ready</span></div>
+          </div>
+        </section>
+
+        <section class="mock-window" aria-label="Report Pen editor preview">
+          <div class="window-bar">
+            <span></span><span></span><span></span>
+            <p>Internship_Report_Draft.pen</p>
+          </div>
+          <div class="window-body">
+            <div class="mini-lines">
+              @for (line of lineNumbers.slice(0, 15); track line) {
+                <span [class.active]="line === 5">{{ line }}</span>
+              }
+            </div>
+            <div class="mini-document">
+              <div class="ai-pill">AI: Editing section...</div>
+              <div class="skeleton title"></div>
+              <div class="skeleton short"></div>
+              <div class="skeleton"></div>
+              <div class="skeleton"></div>
+              <div class="skeleton medium selected"></div>
+              <div class="figure-box">Figure 1.1 Fieldwork architecture</div>
+            </div>
+          </div>
+          <div class="floating-note left">TTU cover page applied</div>
+          <div class="floating-note right">Insert image on line 5</div>
+        </section>
+      </main>
+    </div>
+  }
+
+  @case ('templates') {
+    <div class="page dark">
+      <div class="glow glow-blue"></div>
+      <nav class="top-nav sticky">
+        <button class="icon-button" (click)="navigate('home')" title="Back">Back</button>
+        <button class="brand" (click)="navigate('home')">
+          <span class="brand-mark">TL</span>
+          <span>Template Library</span>
+        </button>
+        <div class="search-wrap">
+          <input type="search" placeholder="Search templates..." [value]="searchQuery" (input)="setSearchQuery($event)" />
+        </div>
+      </nav>
+
+      <main class="templates-main">
+        <header class="section-heading">
+          <h1>Find the perfect <span>template</span></h1>
+          <p>Choose from professionally designed report templates tailored for TTU students across multiple disciplines.</p>
+        </header>
+
+        <section class="assistant-panel">
+          <div>
+            <span class="eyebrow">AI Selection Assistant</span>
+            <h2>Not sure which one to use?</h2>
+            <p>Describe your internship tasks and Report Pen will preload a matching report structure.</p>
+          </div>
+          <div class="assistant-input">
+            <textarea placeholder="Example: I was at MTN working on fibre sales, customer follow-ups, and installations."></textarea>
+            <button class="primary-button" (click)="useTemplate()">Match Template</button>
+          </div>
+        </section>
+
+        <div class="category-tabs">
+          <button [class.active]="activeCategory === 'all'" (click)="activeCategory = 'all'">All Categories</button>
+          @for (category of templateCategories; track category.id) {
+            <button [class.active]="activeCategory === category.id" (click)="activeCategory = category.id">
+              {{ category.title }}
+            </button>
+          }
+        </div>
+
+        <div class="template-sections">
+          @for (category of filteredCategories(); track category.id) {
+            <section class="template-category">
+              <div class="category-heading">
+                <span class="category-icon">{{ category.icon }}</span>
+                <h2>{{ category.title }}</h2>
+                <small>{{ category.templates.length }}</small>
+              </div>
+              <div class="template-grid">
+                @for (template of category.templates; track template.id) {
+                  <article class="template-card">
+                    <div class="document-thumb">
+                      <div></div><div></div><div></div><span>{{ category.icon }}</span><div></div><div></div>
+                    </div>
+                    <h3>{{ template.title }}</h3>
+                    <p>{{ template.description }}</p>
+                    <button class="card-button" (click)="useTemplate()">Use Template</button>
+                  </article>
+                }
+              </div>
+            </section>
+          } @empty {
+            <section class="empty-state">
+              <h2>No templates found</h2>
+              <p>Try adjusting your search term or choose all categories.</p>
+              <button class="outline-button" (click)="searchQuery = ''; activeCategory = 'all'">Clear filters</button>
+            </section>
+          }
+        </div>
+      </main>
+    </div>
+  }
+
+  @case ('workspace') {
+    <div class="workspace">
+      <header class="app-header">
+        <div class="header-left">
+          <button class="icon-button" (click)="navigate('templates')" title="Back">Back</button>
+          <button class="panel-toggle" [class.active]="leftSidebarOpen" (click)="leftSidebarOpen = !leftSidebarOpen">Outline</button>
+          <span class="badge">DRAFT</span>
+          <input value="Industrial_Attachment_Report_2023" aria-label="Document title" />
+        </div>
+        <div class="smart-input">
+          <input placeholder="Describe your internship tasks... (e.g., Update React components)" />
+          <button>Refine</button>
+        </div>
+        <div class="header-actions">
+          <button>Save</button>
+          <button (click)="navigate('preview')">Preview</button>
+          <button class="primary-small" (click)="navigate('preview')">Export PDF</button>
+          <button class="panel-toggle" [class.active]="rightSidebarOpen" (click)="rightSidebarOpen = !rightSidebarOpen">Media</button>
+        </div>
+      </header>
+
+      <div class="toolbar">
+        <button>Times New Roman</button>
+        <button>-</button><span>12</span><button>+</button>
+        <button>B</button><button><i>I</i></button><button><u>U</u></button>
+        <button>Left</button><button>Center</button><button>Right</button><button>Justify</button>
+        <button>1.5 spacing</button>
+        <button class="dictate" [class.listening]="isDictating" (click)="isDictating = !isDictating">
+          {{ isDictating ? 'Listening...' : 'Dictate' }}
+        </button>
+      </div>
+
+      <div class="workspace-body">
+        @if (leftSidebarOpen) {
+          <aside class="outline-sidebar">
+            <h3>Document Outline</h3>
+            <p>8 Sections - 2,450 Words</p>
+            @for (chapter of chapters; track chapter.id) {
+              <button [class.active]="chapter.active">
+                <span>{{ chapter.icon }}</span>
+                {{ chapter.title }}
+                @if (chapter.complete) { <small></small> }
+              </button>
+            }
+            <button class="add-section">Add Section</button>
+          </aside>
+        }
+
+        <main class="editor-shell">
+          <section class="paper cover-page">
+            <span class="template-label">Preloaded TTU Template</span>
+            <div class="ttu-seal">TTU</div>
+            <h1>Takoradi Technical University</h1>
+            <h2>Faculty of Engineering</h2>
+            <h3>Department of Software Engineering</h3>
+            <div class="cover-title">
+              <span>A Report On</span>
+              <strong contenteditable="true">[INSERT REPORT TITLE]</strong>
+              <span>Undertaken At</span>
+              <b contenteditable="true">[INSERT COMPANY NAME]</b>
+            </div>
+            <footer>
+              <div><small>Submitted By:</small><strong contenteditable="true">[YOUR FULL NAME]</strong><span contenteditable="true">Index: [00000000]</span></div>
+              <div><small>Academic Year:</small><strong contenteditable="true">[20XX/20XX]</strong></div>
+            </footer>
+          </section>
+
+          <section class="paper editor-page">
+            <div class="page-marker">1. Introduction</div>
+            <div class="line-column">
+              @for (line of lineNumbers; track line) {
+                <span>{{ line }}</span>
+              }
+            </div>
+            <div #editor class="editor-content" contenteditable="true">
+              <div class="section-title">1.1 Title of First Section</div>
+              <br />
+              <div>Start typing your internship report content here...</div>
+            </div>
+          </section>
+        </main>
+
+        @if (rightSidebarOpen) {
+          <aside class="media-sidebar">
+            <h3>Media Assets</h3>
+            <button class="upload-box">Upload Media<br /><small>Drag and drop images here</small></button>
+            @for (media of mediaLibrary; track media.id) {
+              <article class="media-card">
+                <img [src]="media.url" [alt]="media.name" />
+                <strong>{{ media.name }}</strong>
+                <span>{{ media.date }}</span>
+              </article>
+            }
+            <p class="tip"><strong>Tip:</strong> Dictate image placement by saying "Insert Network Topology on line 5".</p>
+          </aside>
+        }
+      </div>
+    </div>
+  }
+
+  @case ('preview') {
+    <div class="preview-page">
+      <header class="preview-header">
+        <button class="icon-button" (click)="navigate('workspace')" title="Back">Back</button>
+        <div>
+          <h1>Document Preview</h1>
+          <p>Industrial_Attachment_Report_2023.pdf</p>
+        </div>
+        <div class="preview-actions">
+          <button>Share</button>
+          <button class="primary-small" (click)="printDocument()">Download PDF</button>
+        </div>
+      </header>
+
+      <main class="preview-canvas">
+        <section class="print-paper preview-cover">
+          <div class="ttu-seal">TTU</div>
+          <h1>Takoradi Technical University</h1>
+          <h2>Faculty of Engineering</h2>
+          <h3>Department of Software Engineering</h3>
+          <div class="cover-title">
+            <span>A Report On</span>
+            <strong>Student Industrial Work Experience Scheme (SIWES)</strong>
+            <span>Undertaken At</span>
+            <b>TechNova Solutions Ltd.</b>
+          </div>
+          <footer>
+            <div><small>Submitted By:</small><strong>Josephine Gordon</strong><span>Index: 040922119</span></div>
+            <div><small>Academic Year:</small><strong>2023/2024</strong></div>
+          </footer>
+        </section>
+
+        <section class="print-paper preview-content">
+          <h2>1.1 Background of Study</h2>
+          <p>The rapidly evolving landscape of software engineering demands practical experience for students to complement theoretical knowledge. This industrial attachment program, mandated by Takoradi Technical University, aims to bridge this gap.</p>
+          <p>During my period at TechNova Solutions, I was exposed to modern web development practices including React, Node.js, and automated CI/CD pipelines. This report documents my experiences, challenges faced, and the professional growth achieved during the 12-week program.</p>
+          <h2>1.2 Organizational Profile</h2>
+          <p>TechNova Solutions Ltd. is a leading software firm in Accra, specializing in enterprise resource planning systems for medium to large-scale businesses. The organization prides itself on agile methodology and innovative solutions.</p>
+        </section>
+      </main>
+    </div>
+  }
+}
